@@ -31,7 +31,8 @@ func searchHandler(w http.ResponseWriter, req *http.Request) {
 	bb := BoundingBox{Point{f1, f2}, Point{f3, f4}}
 	log.Printf("%f, %f : %f, %f", bb.BottomLeft.X, bb.BottomLeft.Y, bb.TopRight.X, bb.TopRight.Y)
 	sg := &SingleGeostore{TWEET_DB, TWEET_COLLECTION}
-	twts := sg.SearchBox(bb, 100)
+	//twts := sg.SearchBox(bb, 100)
+	twts := sg.FastSearchBox(bb, 100)
 	log.Printf("Length of search results %d", len(twts))
 	d, _ := json.Marshal(twts)
 	w.Write(d)

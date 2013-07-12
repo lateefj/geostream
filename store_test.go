@@ -146,29 +146,17 @@ func TestPolygon(t *testing.T) {
 		t.Errorf("Expected %d coordinates but got %d", len(pts), len(coords))
 	}
 }
-
-func TestSGSearch(t *testing.T) {
+func buildTestData(initLat, initLon int, searchArea BoundingBox) ([]Point, []Point) {
 	tChan := make(chan *httpstream.Tweet)
 	sg := singleGeostoreInstance()
 	go sg.Store(tChan)
-	/*tl := Point{-180, 90}
-	br := Point{180, -90}
-	totalArea := BoundingBox{tl, br}
-	*/
-	stl := Point{122, 42}
-	sbr := Point{125, 47}
-	searchArea := BoundingBox{stl, sbr}
 
-	initLat := 100 //-180
-	initLon := 40  //-90
 	allPoints := make([]Point, 0)
 	expectedPoints := make([]Point, 0)
 	var lat, lon float64
-	//for x := 0; x <= 360; x++ {
-	for x := 0; x <= 30; x++ {
+	for x := 0; x <= 360; x++ {
 		lat = float64(initLat + x)
-		//for y := 0; y <= 180; y++ {
-		for y := 0; y <= 10; y++ {
+		for y := 0; y <= 180; y++ {
 			lon = float64(initLon + y)
 			p := Point{lat, lon}
 			allPoints = append(allPoints, p)
@@ -179,6 +167,14 @@ func TestSGSearch(t *testing.T) {
 		}
 	}
 	close(tChan)
+	return allPoints, expectedPoints
+}
+func TestSGSearch(t *testing.T) {
+	sg := singleGeostoreInstance()
+	stl := Point{122, 42}
+	sbr := Point{125, 47}
+	searchArea := BoundingBox{stl, sbr}
+	allPoints, expectedPoints := buildTestData(100, 40, searchArea)
 	fmt.Printf("Size of all points is %d\n", len(allPoints))
 	fmt.Printf("Size of expectedPoints is %d\n", len(expectedPoints))
 	c := sg.tweetCollection()
@@ -188,7 +184,7 @@ func TestSGSearch(t *testing.T) {
 		t.Errorf("Expected %d but got %d tweets in the database", len(allPoints), size)
 	}
 
-	tws := sg.SearchBox(searchArea)
+	tws := sg.SearchBox(searchArea, 1000)
 	if len(tws) != len(expectedPoints) {
 		t.Errorf("Expected to have %d tweets found but found %d", len(expectedPoints), len(tws))
 	}
@@ -202,5 +198,46 @@ func TestSGSearch(t *testing.T) {
 	if len(tws) != len(expectedPoints) {
 		t.Errorf("Expected to have %d tweets found but found %d", len(expectedPoints), len(tws))
 	}
+}
 
+func Benchmark_SingleBoxSearch(b *testing.B) {
+	sg := singleGeostoreInstance()
+	stl := Point{122, 42}
+	sbr := Point{125, 47}
+	searchArea := BoundingBox{stl, sbr}
+	_, expectedPoints := buildTestData(-180, -90, searchArea)
+	tws := sg.SearchBox(searchArea, 0)
+	if len(tws) != len(expectedPoints) {
+		b.Errorf("Expected to have %d tweets found but found %d", len(expectedPoints), len(tws))
+	}
+}
+
+func Benchmark_SingleBoxFastSearch(b *testing.B) {
+	sg := singleGeostoreInstance()
+	stl := Point{122, 42}
+	sbr := Point{125, 47}
+	searchArea := BoundingBox{stl, sbr}
+	_, expectedPoints := buildTestData(-180, -90, searchArea)
+	tws := sg.FastSearchBox(searchArea, 0)
+	if len(tws) != len(expectedPoints) {
+		b.Errorf("Expected to have %d tweets found but found %d", len(expectedPoints), len(tws))
+	}
+}
+
+func Benchmark_SinglePolygonSearch(b *testing.B) {
+	sg := singleGeostoreInstance()
+	stl := Point{122, 42}
+	sbr := Point{125, 47}
+	searchArea := BoundingBox{stl, sbr}
+	_, expectedPoints := buildTestData(-180, -90, searchArea)
+	pts := make([]Point, 0)
+	pts = append(pts, Point{122, 42})
+	pts = append(pts, Point{122, 47})
+	pts = append(pts, Point{125, 47})
+	pts = append(pts, Point{125, 42})
+	searchPoly := Polygon{pts}
+	tws := sg.Search(searchPoly)
+	if len(tws) != len(expectedPoints) {
+		b.Errorf("Expected to have %d tweets found but found %d", len(expectedPoints), len(tws))
+	}
 }

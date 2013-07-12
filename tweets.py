@@ -22,6 +22,9 @@ ats = conf['ACCESS_TOKEN_SECRET']
 ck = conf['CONSUMER_KEY']
 cs = conf['CONSUMER_SECRET']
 headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
+
+out = open('sample.json', 'w')
+out.write('[')
 class StdOutListener(StreamListener):
     """ A listener handles tweets are the received from the stream.
     This is a basic listener that just prints received tweets to stdout.
@@ -30,6 +33,8 @@ class StdOutListener(StreamListener):
     def on_data(self, data):
         t = json.loads(data)
         if 'coordinates' in t.keys() and t['coordinates']:
+            out.write(data)
+            out.write(',')
             print t
             f = StringIO()
             f.write(data)

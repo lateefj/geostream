@@ -35,10 +35,17 @@ function initialize() {
     //console.log('Size of results is: '+ r.length);
     for(var i = 0; i < r.length; i++) {
       var t = r[i];
-      var lat = t.Coordinates.Coordinates[1];
-      var lon = t.Coordinates.Coordinates[0];
+      //var lat = t.coordinates.coordinates[1];
+      //var lon = t.coordinates.coordinates[0];
+      //var lat = t.Coordinates.Coordinates[1];
+      //var lon = t.Coordinates.Coordinates[0];
 
-      var title = '@' + t.User.screen_name + ':' + t.Text;
+      var lat = t.coordinates.Coordinates[1];
+      var lon = t.coordinates.Coordinates[0];
+
+      //var title = '@' + t.user.screenname + ':' + t.text;
+      //var title = '@' + t.User.screen_name + ':' + t.Text;
+      var title = '@' + t.user.screen_name + ':' + t.text;
       var myLatlng = new google.maps.LatLng(lat, lon);
       var marker = new google.maps.Marker({
         animation: google.maps.Animation.DROP,

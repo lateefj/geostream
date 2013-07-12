@@ -17,6 +17,15 @@ const (
 	TWEET_COLLECTION_MAX_DOCS  = 100000     // Max docs as per specs
 )
 
+type TweetletUser struct {
+	Screenname string `json:"screen_name"`
+}
+type Tweetlet struct {
+	Text        string                `json:"text"`
+	Coordinates httpstream.Coordinate `json:"coordinates"`
+	User        TweetletUser          `json:"user"`
+}
+
 // Index for coordinates
 var COORDS_INDEX = mgo.Index{Key: []string{"coordinates:$2d"}} // Docs have a typo (http://godoc.org/labix.org/v2/mgo#Collection.EnsureIndexKey the field name is swapped with the 2d index type)
 
@@ -126,23 +135,50 @@ func (sg *SingleGeostore) Store(tweets chan *httpstream.Tweet) {
 		}
 	}
 }
-// Search a specific bounding box
-// Performance bottleneck seems to be marhsaling the objects maybe could just return a bson.M to increase performance
-func (sg *SingleGeostore) SearchBox(bb BoundingBox, limit int) []httpstream.Tweet {
-	resp := make([]httpstream.Tweet, 0)
+// Experimental to improve performance
+func (sg *SingleGeostore) FastSearchBox(bb BoundingBox, limit int) []Tweetlet {
+	resp := make([]Tweetlet, 0)
 	c := sg.tweetCollection()
-	println(c.FullName)
 	cords := make([][]float64, 2)
 	cords[0] = bb.BottomLeft.Coordinates()
 	cords[1] = bb.TopRight.Coordinates()
 	q := bson.M{"coordinates": bson.M{"$geoWithin": bson.M{"$box": cords}}}
 	s := time.Now()
-	nq := c.Find(q).Limit(limit)
+	nq := c.Find(q)
+	if limit > 0 {
+		nq = nq.Limit(limit)
+	}
+	iter := nq.Iter()
 	e := time.Now()
 	t := e.Sub(s)
 	log.Printf("MongoDB query took: %f", t.Seconds())
 	s = time.Now()
-	nq.All(&resp) // This is SOOO slow!!!
+	iter.All(&resp) // WHY SO SLOW???
+	e = time.Now()
+	t = e.Sub(s)
+	iter.Close()
+	log.Printf("Marshalling to go structures took: %f", t.Seconds())
+	return resp
+}
+// Search a specific bounding box
+// Performance bottleneck seems to be marhsaling the objects maybe could just return a bson.M to increase performance
+func (sg *SingleGeostore) SearchBox(bb BoundingBox, limit int) []httpstream.Tweet {
+	resp := make([]httpstream.Tweet, 0)
+	c := sg.tweetCollection()
+	cords := make([][]float64, 2)
+	cords[0] = bb.BottomLeft.Coordinates()
+	cords[1] = bb.TopRight.Coordinates()
+	q := bson.M{"coordinates": bson.M{"$geoWithin": bson.M{"$box": cords}}}
+	s := time.Now()
+	nq := c.Find(q)
+	if limit > 0 {
+		nq = nq.Limit(limit)
+	}
+	e := time.Now()
+	t := e.Sub(s)
+	log.Printf("MongoDB query took: %f", t.Seconds())
+	s = time.Now()
+	nq.All(&resp) // Large json objects like httpstream.Tweet are a bit large if it was smaller would make a lot more sense
 	e = time.Now()
 	t = e.Sub(s)
 	log.Printf("Marshalling to go structures took: %f", t.Seconds())
