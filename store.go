@@ -1,7 +1,10 @@
 package main
 
 import (
+	"io"
 	"fmt"
+	"log"
+	"time"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	"github.com/araddon/httpstream"
@@ -27,8 +30,8 @@ func (p *Point) Coordinates() []float64 {
 	c[0] = p.X
 	c[1] = p.Y
 	return c
-
 }
+
 // Basic definition of a bounding box for searching a square area would be better to be a polygon but for example purposes this is fine
 type BoundingBox struct {
 	BottomLeft Point
@@ -60,11 +63,12 @@ func (p *Polygon) Coordinates() [][]float64 {
 }
 
 // Interface to allow for multiple implemntations for benchmarking different strateggies
+// After single node implementation I hope to be able to create a multinode implementation 
 type Geostore interface {
-	Setup()
-	Store(chan *httpstream.Tweet)
-	SearchBox(BoundingBox) []*httpstream.Tweet
-	Search(Polygon) []*httpstream.Tweet
+	Setup()                                    // Allow for initialization mainly for setting up specific types of collections 
+	Store(chan *httpstream.Tweet)              // Using channel if the twitter streaming API ever works
+	SearchBox(BoundingBox) []*httpstream.Tweet // Convenience API
+	Search(Polygon) []*httpstream.Tweet        // Expected use API
 }
 
 type SingleGeostore struct {
@@ -72,24 +76,28 @@ type SingleGeostore struct {
 	CollectionName string
 }
 
-func (sg *SingleGeostore) geoIndexSession() *mgo.Session {
+var mgoSession *mgo.Session
 
-	config, err := GetConfig()
-	if err != nil {
-		fmt.Printf("FAILED TO READ CONFIGURATION FILE!!! %s", err)
-		panic(err)
-		return nil
-	}
-	session, err := mgo.Dial(config.GeoIndexMongoUrl)
-	if err != nil {
-		panic(err)
+func (sg *SingleGeostore) geoIndexSession() *mgo.Session {
+	if mgoSession == nil {
+		config, err := GetConfig()
+		if err != nil {
+			fmt.Printf("FAILED TO READ CONFIGURATION FILE!!! %s", err)
+			panic(err)
+			return nil
+		}
+		mgoSession, err = mgo.Dial(config.GeoIndexMongoUrl)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	// Optional. Switch the session to a monotonic behavior.
-	session.SetMode(mgo.Monotonic, true)
+	//session.SetMode(mgo.Monotonic, true)
 
-	return session
+	return mgoSession.Copy()
 }
+
 func (sg *SingleGeostore) tweetCollection() *mgo.Collection {
 	s := sg.geoIndexSession()
 	c := s.DB(sg.DBName).C(sg.CollectionName)
@@ -105,16 +113,22 @@ func (sg *SingleGeostore) Setup() {
 
 func (sg *SingleGeostore) Store(tweets chan *httpstream.Tweet) {
 	c := sg.tweetCollection()
-	for t := range tweets {
-		err := c.Insert(t)
-		if err != nil {
-			fmt.Printf("(Failed to insert) @%s: %s\n", t.User.ScreenName, t.Text)
-			//panic(err)
+	for {
+		if t, ok := <-tweets; ok {
+			err := c.Insert(t)
+			if err != nil && err != io.EOF {
+				fmt.Printf("(Failed to insert) @%s: %s\n", t.User.ScreenName, t.Text)
+				fmt.Printf("Error: %s\n", err)
+				//panic(err)
+			}
+		} else {
+			return
 		}
 	}
 }
 // Search a specific bounding box
-func (sg *SingleGeostore) SearchBox(bb BoundingBox) []httpstream.Tweet {
+// Performance bottleneck seems to be marhsaling the objects maybe could just return a bson.M to increase performance
+func (sg *SingleGeostore) SearchBox(bb BoundingBox, limit int) []httpstream.Tweet {
 	resp := make([]httpstream.Tweet, 0)
 	c := sg.tweetCollection()
 	println(c.FullName)
@@ -122,7 +136,16 @@ func (sg *SingleGeostore) SearchBox(bb BoundingBox) []httpstream.Tweet {
 	cords[0] = bb.BottomLeft.Coordinates()
 	cords[1] = bb.TopRight.Coordinates()
 	q := bson.M{"coordinates": bson.M{"$geoWithin": bson.M{"$box": cords}}}
-	c.Find(q).All(&resp)
+	s := time.Now()
+	nq := c.Find(q).Limit(limit)
+	e := time.Now()
+	t := e.Sub(s)
+	log.Printf("MongoDB query took: %f", t.Seconds())
+	s = time.Now()
+	nq.All(&resp) // This is SOOO slow!!!
+	e = time.Now()
+	t = e.Sub(s)
+	log.Printf("Marshalling to go structures took: %f", t.Seconds())
 	return resp
 }
 // Search a specific bounding box

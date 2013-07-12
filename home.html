@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+    <style type="text/css">
+      html { height: 100% }
+      body { height: 100%; margin: 0; padding: 0 }
+      #map-canvas { height: 100% }
+    </style>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key={{.}}&sensor=true">
+    </script>
+    <script type="text/javascript">
+function initialize() {
+  var mapOptions = {
+    center: new google.maps.LatLng(45.5236, -122.6750),
+    zoom: 12,
+    mapTypeId: google.maps.MapTypeId.ROADMAP
+  };
+  var map = new google.maps.Map(document.getElementById("map-canvas"), mapOptions);
+  function handleError(e) {
+    console.log('Error retrieving search results');
+    console.log(e);
+    console.dir(e);
+  }
+  var markers = [];
+
+  function clearMarkers() {
+    for (i in markers) {
+      markers[i].setMap(null);
+    }
+  }
+  function handleResults(r) {
+    clearMarkers();
+    //console.log('Size of results is: '+ r.length);
+    for(var i = 0; i < r.length; i++) {
+      var t = r[i];
+      var lat = t.Coordinates.Coordinates[1];
+      var lon = t.Coordinates.Coordinates[0];
+
+      var title = '@' + t.User.screen_name + ':' + t.Text;
+      var myLatlng = new google.maps.LatLng(lat, lon);
+      var marker = new google.maps.Marker({
+        animation: google.maps.Animation.DROP,
+        position: myLatlng,
+        map: map,
+        title:title
+      });
+      attacheInfo(marker, title);
+
+      markers.push(marker);
+    }
+  }
+  function attacheInfo(marker, title) {
+    var infowindow = new google.maps.InfoWindow({
+      content: title
+    });
+
+    google.maps.event.addListener(marker, 'click', function() {
+      infowindow.open(marker.get('map'), marker);
+    });
+    google.maps.event.addListener(marker.get('map'), 'click', function() {infowindow.close()});
+  }
+  google.maps.event.addListener(map, 'bounds_changed', function() {
+    // TODO: TROTTLE THIS!!
+    var bounds = map.getBounds();
+    var ne = bounds.getNorthEast();
+    var sw = bounds.getSouthWest();
+    var bs = sw.lng() + ',' + sw.lat() + ',' + ne.lng() + ',' + ne.lat();
+    var data = {'box': bs};
+
+    $.ajax({
+      url: '/api/search',
+      data: data,
+      success: handleResults,
+      error: handleError,
+      dataType: 'json'
+    });
+  });
+  // Once map is loaded can get the points
+  $(document).ready(function() {
+  });
+}
+google.maps.event.addDomListener(window, 'load', initialize);
+    </script>
+  </head>
+  <body>
+    <div id="map-canvas"/>
+  </body>
+</html>
+

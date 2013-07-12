@@ -1,8 +1,13 @@
 import sys
 import json
+from StringIO import StringIO
 
-from twitter import Twitter, OAuth
-from twitter.stream import TwitterStream
+from tweepy.streaming import StreamListener
+from tweepy import OAuthHandler
+from tweepy import Stream
+
+import requests
+
 
 
 if len(sys.argv) < 2:
@@ -16,26 +21,31 @@ atk = conf['ACCESS_TOKEN_KEY']
 ats = conf['ACCESS_TOKEN_SECRET']
 ck = conf['CONSUMER_KEY']
 cs = conf['CONSUMER_SECRET']
-auth = OAuth(atk, ats, ck, cs)
-t = Twitter(auth=auth)
-f = open('sample.json', 'w')
-f.write(json.dumps(t.search.tweets(geocode='45.5236,122.6750,100km')['statuses']))
-f.close()
-count = 0
+headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
+class StdOutListener(StreamListener):
+    """ A listener handles tweets are the received from the stream.
+    This is a basic listener that just prints received tweets to stdout.
 
-for v in t.search.tweets(geocode='45.5236,122.6750,20km')['statuses']:
-    print(v)
-    count += 1
+    """
+    def on_data(self, data):
+        t = json.loads(data)
+        if 'coordinates' in t.keys() and t['coordinates']:
+            print t
+            f = StringIO()
+            f.write(data)
+            f.seek(0)
+            files = {'tweet': f}
+            requests.post('http://localhost:8000/api/add', files=files)
 
+        return True
 
-print('Count of tweets is {0}'.format(count))
-# Seems like nobody has a working stream client !!!
-"""
-stream = TwitterStream(auth)
-for s in stream.statuses.sample():
-    print(s)
-"""
+    def on_error(self, status):
+        print status
 
+if __name__ == '__main__':
+    l = StdOutListener()
+    auth = OAuthHandler(ck, cs)
+    auth.set_access_token(atk, ats)
 
-
-
+    stream = Stream(auth, l)
+    stream.filter(locations=[-180,-90,180,90])

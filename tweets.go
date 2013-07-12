@@ -1,17 +1,17 @@
 package main
 
 import (
-	//"strings"
-	"os"
-	"log"
-	"github.com/araddon/httpstream"
-	oauth "github.com/akrennmair/goauth"
+//"strings"
+//	"os"
+//	"log"
+//	"github.com/araddon/httpstream"
+//	oauth "github.com/akrennmair/goauth"
 )
 
 const (
 	LOCATIONS = "-180,-90,180,90"
 )
-
+/*
 func main() {
 	config, err := GetConfig()
 	if err != nil {
@@ -19,7 +19,6 @@ func main() {
 		println(err)
 		return
 	}
-
 	httpstream.OauthCon = &oauth.OAuthConsumer{
 		Service:          "twitter",
 		RequestTokenURL:  "http://twitter.com/oauth/request_token",
@@ -74,3 +73,4 @@ func main() {
 	}
 
 }
+*/

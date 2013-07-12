@@ -27,6 +27,30 @@ func readSampleTweets() *TweetList {
 
 }
 
+func TestLoadSample(t *testing.T) {
+	tl := readSampleTweets()
+	if len(tl.Tweets) < 1 {
+		t.Errorf("Failed to read sample tweets")
+		return
+	}
+
+	sg := &SingleGeostore{TWEET_DB, TWEET_COLLECTION}
+	tc := make(chan *httpstream.Tweet, len(tl.Tweets))
+	fmt.Printf("Tweet read in are %d\n", len(tl.Tweets))
+	for i, t := range tl.Tweets {
+		if t.User != nil {
+			fmt.Printf("(%d) @%s: %s\n", i, t.User.ScreenName, t.Text)
+			tc <- &t
+		}
+	}
+
+	sg.Setup()
+	go sg.Store(tc)
+
+	time.Sleep(1 * time.Second)
+	close(tc)
+}
+
 func singleGeostoreInstance() *SingleGeostore {
 	sg := &SingleGeostore{"test_" + TWEET_DB, "test_" + TWEET_COLLECTION}
 	c := sg.tweetCollection()
@@ -158,7 +182,7 @@ func TestSGSearch(t *testing.T) {
 	fmt.Printf("Size of all points is %d\n", len(allPoints))
 	fmt.Printf("Size of expectedPoints is %d\n", len(expectedPoints))
 	c := sg.tweetCollection()
-	time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Second) // Hack hack 
 	size, _ := c.Count()
 	if size != len(allPoints) {
 		t.Errorf("Expected %d but got %d tweets in the database", len(allPoints), size)
