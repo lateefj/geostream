@@ -108,9 +108,22 @@ func TestBoundingBox(t *testing.T) {
 	if !bb.Contains(p) {
 		t.Errorf("Expected point 0, 2 to be in 10x10 bounding box :(")
 	}
-
 }
-func TestSingleGeostoreSearch(t *testing.T) {
+
+func TestPolygon(t *testing.T) {
+	pts := make([]Point, 0)
+	pts = append(pts, Point{1, 1})
+	pts = append(pts, Point{1, 3})
+	pts = append(pts, Point{3, 1})
+	pts = append(pts, Point{3, 3})
+	p := Polygon{pts}
+	coords := p.Coordinates()
+	if len(coords) != len(pts) {
+		t.Errorf("Expected %d coordinates but got %d", len(pts), len(coords))
+	}
+}
+
+func TestSGSearch(t *testing.T) {
 	tChan := make(chan *httpstream.Tweet)
 	sg := singleGeostoreInstance()
 	go sg.Store(tChan)
@@ -121,6 +134,7 @@ func TestSingleGeostoreSearch(t *testing.T) {
 	stl := Point{122, 42}
 	sbr := Point{125, 47}
 	searchArea := BoundingBox{stl, sbr}
+
 	initLat := 100 //-180
 	initLon := 40  //-90
 	allPoints := make([]Point, 0)
@@ -150,7 +164,17 @@ func TestSingleGeostoreSearch(t *testing.T) {
 		t.Errorf("Expected %d but got %d tweets in the database", len(allPoints), size)
 	}
 
-	tws := sg.Search(searchArea)
+	tws := sg.SearchBox(searchArea)
+	if len(tws) != len(expectedPoints) {
+		t.Errorf("Expected to have %d tweets found but found %d", len(expectedPoints), len(tws))
+	}
+	pts := make([]Point, 0)
+	pts = append(pts, Point{122, 42})
+	pts = append(pts, Point{122, 47})
+	pts = append(pts, Point{125, 47})
+	pts = append(pts, Point{125, 42})
+	searchPoly := Polygon{pts}
+	tws = sg.Search(searchPoly)
 	if len(tws) != len(expectedPoints) {
 		t.Errorf("Expected to have %d tweets found but found %d", len(expectedPoints), len(tws))
 	}

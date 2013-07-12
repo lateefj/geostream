@@ -43,16 +43,28 @@ func (bb *BoundingBox) Contains(p Point) bool {
 	return false
 }
 
-// Standard format
-func (bb *BoundingBox) String() string {
-	return fmt.Sprintf("%f,%f,%f,%f", bb.BottomLeft.X, bb.BottomLeft.Y, bb.TopRight.X, bb.TopRight.Y)
+type Polygon struct {
+	Points []Point
+}
+
+// Generate list of coordinates for based on Points
+func (p *Polygon) Coordinates() [][]float64 {
+	c := make([][]float64, len(p.Points))
+	for i, x := range p.Points {
+		pc := make([]float64, 2)
+		pc[0] = x.X
+		pc[1] = x.Y
+		c[i] = pc
+	}
+	return c
 }
 
 // Interface to allow for multiple implemntations for benchmarking different strateggies
 type Geostore interface {
 	Setup()
 	Store(chan *httpstream.Tweet)
-	Search(BoundingBox) chan *httpstream.Tweet
+	SearchBox(BoundingBox) []*httpstream.Tweet
+	Search(Polygon) []*httpstream.Tweet
 }
 
 type SingleGeostore struct {
@@ -101,43 +113,24 @@ func (sg *SingleGeostore) Store(tweets chan *httpstream.Tweet) {
 		}
 	}
 }
-
-func (sg *SingleGeostore) Search(bb BoundingBox) []httpstream.Tweet {
+// Search a specific bounding box
+func (sg *SingleGeostore) SearchBox(bb BoundingBox) []httpstream.Tweet {
 	resp := make([]httpstream.Tweet, 0)
 	c := sg.tweetCollection()
 	println(c.FullName)
 	cords := make([][]float64, 2)
 	cords[0] = bb.BottomLeft.Coordinates()
 	cords[1] = bb.TopRight.Coordinates()
-	q := bson.M{"coordinates": bson.M{"$geoWithin": bson.M{"$geometry": bson.M{"type": "Polygon", "coordinates": cords}}}}
+	q := bson.M{"coordinates": bson.M{"$geoWithin": bson.M{"$box": cords}}}
 	c.Find(q).All(&resp)
 	return resp
 }
-
-/*
-func main() {
-		session, err := mgo.Dial("server1.example.com,server2.example.com")
-		if err != nil {
-			panic(err)
-		}
-		defer session.Close()
-
-		// Optional. Switch the session to a monotonic behavior.
-		session.SetMode(mgo.Monotonic, true)
-
-		c := session.DB("test").C("people")
-		err = c.Insert(&Person{"Ale", "+55 53 8116 9639"},
-			&Person{"Cla", "+55 53 8402 8510"})
-		if err != nil {
-			panic(err)
-		}
-
-		result := Person{}
-		err = c.Find(bson.M{"name": "Ale"}).One(&result)
-		if err != nil {
-			panic(err)
-		}
-
-		fmt.Println("Phone:", result.Phone)
+// Search a specific bounding box
+func (sg *SingleGeostore) Search(poly Polygon) []httpstream.Tweet {
+	resp := make([]httpstream.Tweet, 0)
+	c := sg.tweetCollection()
+	coords := poly.Coordinates()
+	q := bson.M{"coordinates": bson.M{"$geoWithin": bson.M{"$polygon": coords}}}
+	c.Find(q).All(&resp)
+	return resp
 }
-*/
