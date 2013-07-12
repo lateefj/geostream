@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"labix.org/v2/mgo"
-	//"labix.org/v2/mgo/bson"
+	"labix.org/v2/mgo/bson"
 	"github.com/araddon/httpstream"
 )
 
@@ -17,17 +17,35 @@ const (
 // Index for coordinates
 var COORDS_INDEX = mgo.Index{Key: []string{"coordinates:$2d"}} // Docs have a typo (http://godoc.org/labix.org/v2/mgo#Collection.EnsureIndexKey the field name is swapped with the 2d index type)
 
+// Basic point
+type Point struct {
+	X, Y float64
+}
+
+func (p *Point) Coordinates() []float64 {
+	c := make([]float64, 2)
+	c[0] = p.X
+	c[1] = p.Y
+	return c
+
+}
 // Basic definition of a bounding box for searching a square area would be better to be a polygon but for example purposes this is fine
 type BoundingBox struct {
-	Top    float32
-	Left   float32
-	Bottom float32
-	Right  float32
+	BottomLeft Point
+	TopRight   Point
+}
+
+// Pretty standard checking to see if the point is in the bounding box
+func (bb *BoundingBox) Contains(p Point) bool {
+	if (p.X >= bb.BottomLeft.X && p.X <= bb.TopRight.X) && (p.Y >= bb.BottomLeft.Y && p.Y <= bb.TopRight.Y) {
+		return true
+	}
+	return false
 }
 
 // Standard format
 func (bb *BoundingBox) String() string {
-	return fmt.Sprintf("%f,%f,%f,%f", bb.Top, bb.Left, bb.Bottom, bb.Right)
+	return fmt.Sprintf("%f,%f,%f,%f", bb.BottomLeft.X, bb.BottomLeft.Y, bb.TopRight.X, bb.TopRight.Y)
 }
 
 // Interface to allow for multiple implemntations for benchmarking different strateggies
@@ -82,13 +100,17 @@ func (sg *SingleGeostore) Store(tweets chan *httpstream.Tweet) {
 			//panic(err)
 		}
 	}
-
 }
-func (sg *SingleGeostore) Search(BoundingBox) chan *httpstream.Tweet {
-	resp := make(chan *httpstream.Tweet)
+
+func (sg *SingleGeostore) Search(bb BoundingBox) []httpstream.Tweet {
+	resp := make([]httpstream.Tweet, 0)
 	c := sg.tweetCollection()
 	println(c.FullName)
-
+	cords := make([][]float64, 2)
+	cords[0] = bb.BottomLeft.Coordinates()
+	cords[1] = bb.TopRight.Coordinates()
+	q := bson.M{"coordinates": bson.M{"$geoWithin": bson.M{"$geometry": bson.M{"type": "Polygon", "coordinates": cords}}}}
+	c.Find(q).All(&resp)
 	return resp
 }
 
