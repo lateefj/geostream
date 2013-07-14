@@ -1,7 +1,7 @@
 geostream
 =========
 
-![Image](../blob/master/screenshot.png?raw=true)
+![Image](screenshot.png?raw=true)
 
 Simple example application that uses Golang, Mongodb with source of data from streaming Twitter. DEMO APP ONLY DO NOT USE EXECPT FOR REFERENCE
 
