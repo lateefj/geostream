@@ -1,6 +1,8 @@
 geostream
 =========
 
+![Image](../blob/master/screenshot.png?raw=true)
+
 Simple example application that uses Golang, Mongodb with source of data from streaming Twitter. DEMO APP ONLY DO NOT USE EXECPT FOR REFERENCE
 
 Very simple Javascript UI that displays on a Google map Twitter posts on a map.
@@ -20,8 +22,14 @@ There is a basic configuration file that needs these parameters (config_sample.j
 }
 ```
 
-Install
--------
+Quick Install
+-------------
+1. go get github.com/lateefj/geostream
+2. goestream --config=my_config.json
+
+
+Source Install
+--------------
 
 1. Edit configuration file (config_sample.json)
 2. go get && go build
