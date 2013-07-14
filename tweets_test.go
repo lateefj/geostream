@@ -27,6 +27,5 @@ func TestGetTweets(t *testing.T) {
 			close(stream)
 		}
 		i++
-
 	}
 }

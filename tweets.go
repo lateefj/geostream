@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	//"github.com/araddon/httpstream"
 	"github.com/lateefj/httpstream"
-	oauth "github.com/akrennmair/goauth"
+	oauth "github.com/araddon/goauth"
 )
 
 const (
