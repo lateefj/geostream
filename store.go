@@ -102,6 +102,7 @@ func (sg *SingleGeostore) Store(tweets chan *httpstream.Tweet) {
 	c := sg.tweetCollection()
 	for {
 		if t, ok := <-tweets; ok {
+			//log.Printf("Inserting tweet %s", t.Text)
 			err := c.Insert(t)
 			if err != nil && err != io.EOF {
 				fmt.Printf("(Failed to insert) @%s: %s\n", t.User.ScreenName, t.Text)

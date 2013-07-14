@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"flag"
+	//"time"
 	"strconv"
 	"strings"
 	"net/http"
@@ -18,7 +20,6 @@ import (
 const (
 	SERVER_NAME = "lhj.me (geostream) 0.1"
 )
-
 
 func searchHandler(w http.ResponseWriter, req *http.Request) {
 	bs := req.FormValue("box")
@@ -76,7 +77,23 @@ func homeHandler(w http.ResponseWriter, req *http.Request) {
 	homeTempl.Execute(w, config.GoogleMapsAPI)
 }
 
+// This just consumes tweets
+// TODO: Need to handle failures and reconnect in some way!!!
+func streamProducer() {
+	sg := &SingleGeostore{TWEET_DB, TWEET_COLLECTION}
+	c := make(chan *httpstream.Tweet)
+	go sg.Store(c)
+	GetTweets(c)
+}
+
+var startTwitterStream *bool = flag.Bool("stream", true, "Start the Twitter streaming in the web server ")
+
 func main() {
+	flag.Parse()
+	if *startTwitterStream { // Flag for having the streaming built into server
+		log.Printf("Staring twitter streaming service in web server ...")
+		go streamProducer()
+	}
 	sg := &SingleGeostore{TWEET_DB, TWEET_COLLECTION}
 	sg.Setup()
 	r := mux.NewRouter()

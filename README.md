@@ -5,7 +5,7 @@ Simple example application that uses Golang, Mongodb with source of data from st
 
 Very simple Javascript UI that displays on a Google map Twitter posts on a map.
 
-There is a basic configuration file that needs these parameters:
+There is a basic configuration file that needs these parameters (config_sample.json):
 
 ```javascript
 
@@ -20,15 +20,28 @@ There is a basic configuration file that needs these parameters:
 }
 ```
 
-Currenly this file must be located in: $HOME/env_geostream.json
+Install
+-------
 
-Python setup: pip install -r requirements.txt
+1. Edit configuration file (config_sample.json)
+2. go get && go build
+3. ./geostream --config=config_sample.json
+4. Browser: http://localhost:8000
 
-Python script command: python tweets.py $HOME/env_geostream.json
+Options
+-------
+./geostrem --stream=true/false by default the built in streaming is on however this can be turned off by just passing the --stream=false
+
+Python Client
+-------------
+
+Python setup: cd client; pip install -r requirements.txt
+
+Python script command: python tweets.py $CONFIG_FILE
 
 
 TODO:
- * Refactor to use https://github.com/akavel/polyclip-go types
+-----
+ * Clean code mess
  * Implement sharded solution for goespacial data
- * Make config file a parameter instead of default location of $HOME/env_geostream.json
- * Twitter streaming in Go currently OAuth was not working with streaming or something???
+

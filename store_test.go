@@ -87,6 +87,7 @@ func distributedGeostoreInstance() *DistributedGeostore {
 	c := dg.geoIndexCollection()
 	// TODO: Not sure I like this but namespace should be good enough to prevent accidental production delete
 	c.DropCollection()
+	dg.Setup()
 	return dg
 }
 
@@ -100,6 +101,36 @@ func TestSingleGeostoreSample(t *testing.T) {
 	if size != len(tl.Tweets) {
 		t.Errorf("\nExpected %d tweets but only had %d\n", tl.Tweets, size)
 	}
+}
+
+func buildTestQuads(dg *DistributedGeostore, initLat, initLon, xinc int) []QuadrantLookup {
+	config, err := GetConfig()
+	if err != nil {
+		fmt.Printf("FAILED TO READ CONFIGURATION FILE!!! %s", err)
+		panic(err)
+		return nil
+	}
+	quads := make([]QuadrantLookup, 0)
+	yinc := xinc / 2
+
+	var lat, lon float64
+	preLat := float64(initLat)
+	preLon := float64(initLon)
+	for x := 0; x <= 360; x = x + xinc {
+		lat = float64(initLat + x)
+		for y := 0; y <= 180; y = y + yinc {
+			lon = float64(initLon + y)
+			pts := make([]polyclip.Point, 0)
+			pts = append(pts, NewPoint(preLat, preLon).Point)
+			pts = append(pts, NewPoint(lat, preLon).Point)
+			pts = append(pts, NewPoint(lat, lon).Point)
+			pts = append(pts, NewPoint(preLat, lon).Point)
+			poly := Polygon{pts}
+			q := QuadrantLookup{poly, config.GeoIndexMongoUrl, dg.GeoIdxDBName, dg.GeoIdxCollName}
+			quads = append(quads, q)
+		}
+	}
+	return quads
 }
 
 func TestDistributedGestoreSample(t *testing.T) {

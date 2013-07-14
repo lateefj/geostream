@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"fmt"
+	"flag"
 	"errors"
 	"io/ioutil"
 	"encoding/json"
@@ -22,7 +23,14 @@ type Config struct {
 	AccessTokenSecret string `json:"ACCESS_TOKEN_SECRET"`
 }
 
+var configParam *string = flag.String("config", "", "Config file location")
+
 func configPath(name string) string {
+	flag.Parse()
+	if *configParam != "" {
+		return *configParam
+	}
+
 	home := os.Getenv("HOME")
 
 	return fmt.Sprintf("%s/%s", home, name)
