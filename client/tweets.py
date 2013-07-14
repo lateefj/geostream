@@ -9,7 +9,6 @@ from tweepy import Stream
 import requests
 
 
-
 if len(sys.argv) < 2:
     print('FAILING NEED CONFIGURATION file as first parameter')
     sys.exit(1)
@@ -23,8 +22,8 @@ ck = conf['CONSUMER_KEY']
 cs = conf['CONSUMER_SECRET']
 headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
 
-out = open('sample.json', 'w')
-out.write('[')
+#out = open('sample.json', 'w')
+#out.write('[')
 class StdOutListener(StreamListener):
     """ A listener handles tweets are the received from the stream.
     This is a basic listener that just prints received tweets to stdout.
@@ -33,9 +32,9 @@ class StdOutListener(StreamListener):
     def on_data(self, data):
         t = json.loads(data)
         if 'coordinates' in t.keys() and t['coordinates']:
-            out.write(data)
-            out.write(',')
-            print t
+            #out.write(data)
+            #out.write(',')
+            print(u'@{0}: {1}'.format(t['user']['screen_name'], t['text']))
             f = StringIO()
             f.write(data)
             f.seek(0)

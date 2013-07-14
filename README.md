@@ -28,7 +28,7 @@ Python script command: python tweets.py $HOME/env_geostream.json
 
 
 TODO:
-
- * Twitter streaming in Go currently OAuth was not working
+ * Refactor to use https://github.com/akavel/polyclip-go types
  * Implement sharded solution for goespacial data
  * Make config file a parameter instead of default location of $HOME/env_geostream.json
+ * Twitter streaming in Go currently OAuth was not working with streaming or something???

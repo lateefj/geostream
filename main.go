@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -8,7 +9,8 @@ import (
 	"io/ioutil"
 	"text/template"
 	"encoding/json"
-	"github.com/araddon/httpstream"
+	//"github.com/araddon/httpstream"
+	"github.com/lateefj/httpstream"
 	"code.google.com/p/gorilla/mux"
 	"bitbucket.org/lateefj/httphacks"
 )
@@ -17,18 +19,15 @@ const (
 	SERVER_NAME = "lhj.me (geostream) 0.1"
 )
 
+
 func searchHandler(w http.ResponseWriter, req *http.Request) {
-	// TODO: IMPLEMENT ME!!!
-	b, _ := ioutil.ReadAll(req.Body)
-	println(string(b))
 	bs := req.FormValue("box")
 	parts := strings.Split(bs, ",")
-	println(parts)
 	f1, _ := strconv.ParseFloat(parts[0], 64)
 	f2, _ := strconv.ParseFloat(parts[1], 64)
 	f3, _ := strconv.ParseFloat(parts[2], 64)
 	f4, _ := strconv.ParseFloat(parts[3], 64)
-	bb := BoundingBox{Point{f1, f2}, Point{f3, f4}}
+	bb := BoundingBox{NewPoint(f1, f2), NewPoint(f3, f4)}
 	log.Printf("%f, %f : %f, %f", bb.BottomLeft.X, bb.BottomLeft.Y, bb.TopRight.X, bb.TopRight.Y)
 	sg := &SingleGeostore{TWEET_DB, TWEET_COLLECTION}
 	//twts := sg.SearchBox(bb, 100)
@@ -82,14 +81,14 @@ func main() {
 	sg.Setup()
 	r := mux.NewRouter()
 	s := httphacks.Server{SERVER_NAME, nil, r}
-	println(s.Name)
+	fmt.Printf("Starting server: %s\n", s.Name)
 
 	apiR := r.PathPrefix("/api/").Subrouter()
 	InitRest(apiR)
 	// Static files 
-	http.Handle("/js/", http.StripPrefix("/js", http.FileServer(http.Dir("js/"))))
-	http.Handle("/css/", http.StripPrefix("/css", http.FileServer(http.Dir("css/"))))
-	http.Handle("/dart/", http.StripPrefix("/dart", http.FileServer(http.Dir("dart/"))))
+	//http.Handle("/js/", http.StripPrefix("/js", http.FileServer(http.Dir("js/"))))
+	//http.Handle("/css/", http.StripPrefix("/css", http.FileServer(http.Dir("css/"))))
+	//http.Handle("/dart/", http.StripPrefix("/dart", http.FileServer(http.Dir("dart/"))))
 
 	// Templates 
 	r.HandleFunc("/", homeHandler)

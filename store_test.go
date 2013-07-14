@@ -7,7 +7,9 @@ import (
 	"io/ioutil"
 	"encoding/json"
 	"testing"
-	"github.com/araddon/httpstream"
+	"github.com/lateefj/httpstream"
+	//"github.com/araddon/httpstream"
+	polyclip "github.com/akavel/polyclip-go"
 )
 
 type TweetList struct {
@@ -37,9 +39,9 @@ func TestLoadSample(t *testing.T) {
 	sg := &SingleGeostore{TWEET_DB, TWEET_COLLECTION}
 	tc := make(chan *httpstream.Tweet, len(tl.Tweets))
 	fmt.Printf("Tweet read in are %d\n", len(tl.Tweets))
-	for i, t := range tl.Tweets {
+	for _, t := range tl.Tweets {
 		if t.User != nil {
-			fmt.Printf("(%d) @%s: %s\n", i, t.User.ScreenName, t.Text)
+			//fmt.Printf("(%d) @%s: %s\n", i, t.User.ScreenName, t.Text)
 			tc <- &t
 		}
 	}
@@ -51,6 +53,28 @@ func TestLoadSample(t *testing.T) {
 	close(tc)
 }
 
+func storeSampleTweets(gs Geostore, t *testing.T) *TweetList {
+	tl := readSampleTweets()
+	if len(tl.Tweets) < 1 {
+		t.Errorf("Failed to read sample tweets")
+		return nil
+	}
+
+	tc := make(chan *httpstream.Tweet, len(tl.Tweets))
+	fmt.Printf("Tweet read in are %d\n", len(tl.Tweets))
+	for _, t := range tl.Tweets {
+		if t.User != nil {
+			//fmt.Printf("(%d) @%s: %s\n", i, t.User.ScreenName, t.Text)
+			tc <- &t
+		}
+	}
+
+	gs.Setup()
+	go gs.Store(tc)
+	return tl
+
+}
+
 func singleGeostoreInstance() *SingleGeostore {
 	sg := &SingleGeostore{"test_" + TWEET_DB, "test_" + TWEET_COLLECTION}
 	c := sg.tweetCollection()
@@ -58,26 +82,30 @@ func singleGeostoreInstance() *SingleGeostore {
 	c.DropCollection()
 	return sg
 }
-func TestSingleGeostore(t *testing.T) {
-	tl := readSampleTweets()
-	if len(tl.Tweets) < 1 {
-		t.Errorf("Failed to read sample tweets")
-		return
-	}
+func distributedGeostoreInstance() *DistributedGeostore {
+	dg := &DistributedGeostore{"test_" + TWEET_DB, "test_" + TWEET_COLLECTION}
+	c := dg.geoIndexCollection()
+	// TODO: Not sure I like this but namespace should be good enough to prevent accidental production delete
+	c.DropCollection()
+	return dg
+}
 
+func TestSingleGeostoreSample(t *testing.T) {
 	sg := singleGeostoreInstance() // Must be here or collection won't get dropped before these are added
-	tc := make(chan *httpstream.Tweet, len(tl.Tweets))
-	fmt.Printf("Tweet read in are %d\n", len(tl.Tweets))
-	for i, t := range tl.Tweets {
-		if t.User != nil {
-			fmt.Printf("(%d) @%s: %s\n", i, t.User.ScreenName, t.Text)
-			tc <- &t
-		}
-	}
-
-	sg.Setup()
-	go sg.Store(tc)
+	tl := storeSampleTweets(sg, t)
 	c := sg.tweetCollection()
+	// Wait for the inserts to complete
+	time.Sleep(1 * time.Second)
+	size, _ := c.Count()
+	if size != len(tl.Tweets) {
+		t.Errorf("\nExpected %d tweets but only had %d\n", tl.Tweets, size)
+	}
+}
+
+func TestDistributedGestoreSample(t *testing.T) {
+	dg := distributedGeostoreInstance() // Must be here or collection won't get dropped before these are added
+	tl := storeSampleTweets(dg, t)
+	c := dg.geoIndexCollection()
 	// Wait for the inserts to complete
 	time.Sleep(1 * time.Second)
 	size, _ := c.Count()
@@ -98,54 +126,9 @@ func buildTweet(tChan chan *httpstream.Tweet, p Point) {
 		Text:        fmt.Sprintf("Tweeting location %f, %f", p.X, p.Y),
 		Coordinates: c,
 	}
-
 	tChan <- t
-
 }
 
-func TestBoundingBox(t *testing.T) {
-
-	bl := Point{0, 0}
-	tr := Point{10, 10}
-	bb := BoundingBox{bl, tr}
-	p := Point{1, 1}
-	if !bb.Contains(p) {
-		t.Errorf("Expected point 1, 1 to be in 10x10 bounding box :(")
-	}
-	p = Point{11, 1}
-	if bb.Contains(p) {
-		t.Errorf("Expected point 11, 1 to be outside of 10x10 bounding box :(")
-	}
-	p = Point{1, 11}
-	if bb.Contains(p) {
-		t.Errorf("Expected point 1, 11 to be outside of 10x10 bounding box :(")
-	}
-	p = Point{11, 11}
-	if bb.Contains(p) {
-		t.Errorf("Expected point 11, 11 to be outside of 10x10 bounding box :(")
-	}
-	p = Point{2, 2}
-	if !bb.Contains(p) {
-		t.Errorf("Expected point 2, 2 to be in 10x10 bounding box :(")
-	}
-	p = Point{0, 2}
-	if !bb.Contains(p) {
-		t.Errorf("Expected point 0, 2 to be in 10x10 bounding box :(")
-	}
-}
-
-func TestPolygon(t *testing.T) {
-	pts := make([]Point, 0)
-	pts = append(pts, Point{1, 1})
-	pts = append(pts, Point{1, 3})
-	pts = append(pts, Point{3, 1})
-	pts = append(pts, Point{3, 3})
-	p := Polygon{pts}
-	coords := p.Coordinates()
-	if len(coords) != len(pts) {
-		t.Errorf("Expected %d coordinates but got %d", len(pts), len(coords))
-	}
-}
 func buildTestData(initLat, initLon int, searchArea BoundingBox) ([]Point, []Point) {
 	tChan := make(chan *httpstream.Tweet)
 	sg := singleGeostoreInstance()
@@ -158,7 +141,7 @@ func buildTestData(initLat, initLon int, searchArea BoundingBox) ([]Point, []Poi
 		lat = float64(initLat + x)
 		for y := 0; y <= 180; y++ {
 			lon = float64(initLon + y)
-			p := Point{lat, lon}
+			p := NewPoint(lat, lon)
 			allPoints = append(allPoints, p)
 			if searchArea.Contains(p) {
 				expectedPoints = append(expectedPoints, p)
@@ -171,8 +154,8 @@ func buildTestData(initLat, initLon int, searchArea BoundingBox) ([]Point, []Poi
 }
 func TestSGSearch(t *testing.T) {
 	sg := singleGeostoreInstance()
-	stl := Point{122, 42}
-	sbr := Point{125, 47}
+	stl := NewPoint(122, 42)
+	sbr := NewPoint(125, 47)
 	searchArea := BoundingBox{stl, sbr}
 	allPoints, expectedPoints := buildTestData(100, 40, searchArea)
 	fmt.Printf("Size of all points is %d\n", len(allPoints))
@@ -188,11 +171,11 @@ func TestSGSearch(t *testing.T) {
 	if len(tws) != len(expectedPoints) {
 		t.Errorf("Expected to have %d tweets found but found %d", len(expectedPoints), len(tws))
 	}
-	pts := make([]Point, 0)
-	pts = append(pts, Point{122, 42})
-	pts = append(pts, Point{122, 47})
-	pts = append(pts, Point{125, 47})
-	pts = append(pts, Point{125, 42})
+	pts := make([]polyclip.Point, 0)
+	pts = append(pts, NewPoint(122, 42).Point)
+	pts = append(pts, NewPoint(122, 47).Point)
+	pts = append(pts, NewPoint(125, 47).Point)
+	pts = append(pts, NewPoint(125, 42).Point)
 	searchPoly := Polygon{pts}
 	tws = sg.Search(searchPoly)
 	if len(tws) != len(expectedPoints) {
@@ -202,8 +185,8 @@ func TestSGSearch(t *testing.T) {
 
 func Benchmark_SingleBoxSearch(b *testing.B) {
 	sg := singleGeostoreInstance()
-	stl := Point{122, 42}
-	sbr := Point{125, 47}
+	stl := NewPoint(122, 42)
+	sbr := NewPoint(125, 47)
 	searchArea := BoundingBox{stl, sbr}
 	_, expectedPoints := buildTestData(-180, -90, searchArea)
 	tws := sg.SearchBox(searchArea, 0)
@@ -214,8 +197,8 @@ func Benchmark_SingleBoxSearch(b *testing.B) {
 
 func Benchmark_SingleBoxFastSearch(b *testing.B) {
 	sg := singleGeostoreInstance()
-	stl := Point{122, 42}
-	sbr := Point{125, 47}
+	stl := NewPoint(122, 42)
+	sbr := NewPoint(125, 47)
 	searchArea := BoundingBox{stl, sbr}
 	_, expectedPoints := buildTestData(-180, -90, searchArea)
 	tws := sg.FastSearchBox(searchArea, 0)
@@ -226,15 +209,15 @@ func Benchmark_SingleBoxFastSearch(b *testing.B) {
 
 func Benchmark_SinglePolygonSearch(b *testing.B) {
 	sg := singleGeostoreInstance()
-	stl := Point{122, 42}
-	sbr := Point{125, 47}
+	stl := NewPoint(122, 42)
+	sbr := NewPoint(125, 47)
 	searchArea := BoundingBox{stl, sbr}
 	_, expectedPoints := buildTestData(-180, -90, searchArea)
-	pts := make([]Point, 0)
-	pts = append(pts, Point{122, 42})
-	pts = append(pts, Point{122, 47})
-	pts = append(pts, Point{125, 47})
-	pts = append(pts, Point{125, 42})
+	pts := make([]polyclip.Point, 0)
+	pts = append(pts, NewPoint(122, 42).Point)
+	pts = append(pts, NewPoint(122, 47).Point)
+	pts = append(pts, NewPoint(125, 47).Point)
+	pts = append(pts, NewPoint(125, 42).Point)
 	searchPoly := Polygon{pts}
 	tws := sg.Search(searchPoly)
 	if len(tws) != len(expectedPoints) {
