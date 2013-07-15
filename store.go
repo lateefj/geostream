@@ -4,7 +4,6 @@ import (
 	"io"
 	"fmt"
 	"log"
-	"time"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	"github.com/lateefj/httpstream"
@@ -162,21 +161,11 @@ func (sg *SingleGeostore) FastSearchBox(bb BoundingBox, limit int) []Tweetlet {
 	cords[0] = bb.BottomLeft.Coordinates()
 	cords[1] = bb.TopRight.Coordinates()
 	q := bson.M{"coordinates": bson.M{"$geoWithin": bson.M{"$box": cords}}}
-	s := time.Now()
 	nq := c.Find(q)
 	if limit > 0 {
 		nq = nq.Limit(limit)
 	}
-	iter := nq.Iter()
-	e := time.Now()
-	t := e.Sub(s)
-	log.Printf("MongoDB query took: %f", t.Seconds())
-	s = time.Now()
-	iter.All(&resp) // WHY SO SLOW???
-	e = time.Now()
-	t = e.Sub(s)
-	iter.Close()
-	log.Printf("Marshalling to go structures took: %f", t.Seconds())
+	nq.All(&resp)
 	return resp
 }
 // Search a specific bounding box
@@ -188,19 +177,11 @@ func (sg *SingleGeostore) SearchBox(bb BoundingBox, limit int) []httpstream.Twee
 	cords[0] = bb.BottomLeft.Coordinates()
 	cords[1] = bb.TopRight.Coordinates()
 	q := bson.M{"coordinates": bson.M{"$geoWithin": bson.M{"$box": cords}}}
-	s := time.Now()
 	nq := c.Find(q)
 	if limit > 0 {
 		nq = nq.Limit(limit)
 	}
-	e := time.Now()
-	t := e.Sub(s)
-	log.Printf("MongoDB query took: %f", t.Seconds())
-	s = time.Now()
 	nq.All(&resp) // Large json objects like httpstream.Tweet are a bit large if it was smaller would make a lot more sense
-	e = time.Now()
-	t = e.Sub(s)
-	log.Printf("Marshalling to go structures took: %f", t.Seconds())
 	return resp
 }
 
