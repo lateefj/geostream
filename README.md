@@ -22,6 +22,7 @@ There is a basic configuration file that needs these parameters (config_sample.j
 }
 ```
 
+#Replace all the REQUIRED with values in your configuration file of which you can get from https://dev.twitter.com/
 
 Source Install
 --------------
