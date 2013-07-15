@@ -25,11 +25,11 @@ There is a basic configuration file that needs these parameters (config_sample.j
 
 Source Install
 --------------
-
-1. Edit configuration file (config_sample.json)
-2. go get && go build
-3. ./geostream --config=config_sample.json
-4. Browser: http://localhost:8000
+1. git clone git@github.com:lateefj/geostream.git
+2. Edit configuration file (config_sample.json)
+3. go get && go build
+4. ./geostream --config=config_sample.json
+5. Browser: http://localhost:8000
 
 Options
 -------
