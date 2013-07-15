@@ -9,14 +9,15 @@ import (
 	"labix.org/v2/mgo/bson"
 	"github.com/lateefj/httpstream"
 	//"github.com/araddon/httpstream"
-	polyclip "github.com/akavel/polyclip-go"
+	//	polyclip "github.com/akavel/polyclip-go"
 )
 
 const (
 	TWEET_DB                   = "tdb"
 	TWEET_COLLECTION           = "tweets"
-	TWEET_COLLECTION_MAX_BYTES = 8589934592 // 8 Gig
-	TWEET_COLLECTION_MAX_DOCS  = 100000     // Max docs as per specs
+	QUAD_COLLECTION            = "quads"
+	TWEET_COLLECTION_MAX_BYTES = 104857600 // 8 Gig
+	TWEET_COLLECTION_MAX_DOCS  = 100000    // Max docs as per specs
 
 )
 
@@ -30,8 +31,12 @@ type Tweetlet struct {
 }
 
 // Index for coordinates
-var COORDS_INDEX = mgo.Index{Key: []string{"Coordinates.Coordinates:$2d"}} // Docs have a typo (http://godoc.org/labix.org/v2/mgo#Collection.EnsureIndexKey the field name is swapped with the 2d index type)
-var PLACE_INDEX = mgo.Index{Key: []string{"Place.BoundingBox:$2d"}}        // Docs have a typo (http://godoc.org/labix.org/v2/mgo#Collection.EnsureIndexKey the field name is swapped with the 2d index type)
+var COORDS_INDEX = mgo.Index{
+	Key: []string{"$2d:coordinates.coordinates"},
+} // Docs have a typo (http://godoc.org/labix.org/v2/mgo#Collection.EnsureIndexKey the field name is swapped with the 2d index type)
+var PLACE_INDEX = mgo.Index{
+	Key: []string{"$2d:bounding.coordinates}"},
+} // Docs have a typo (http://godoc.org/labix.org/v2/mgo#Collection.EnsureIndexKey the field name is swapped with the 2d index type)
 
 // Interface to allow for multiple implemntations for benchmarking different strateggies
 // After single node implementation I hope to be able to create a multinode implementation 
@@ -48,6 +53,7 @@ func MongoSession(url string) (*mgo.Session, error) {
 		log.Printf("Failed to get mongo session for %s error: %s", url, err)
 		return nil, err
 	}
+	s.SetMode(mgo.Monotonic, true)
 	return s, nil
 }
 
@@ -55,6 +61,30 @@ func MongoSession(url string) (*mgo.Session, error) {
 func MongoCollection(s *mgo.Session, db, name string) *mgo.Collection {
 	c := s.DB(db).C(name)
 	return c
+}
+
+var collectionCache map[string]*mgo.Collection
+// Cached collection is needed so we doon't overload the databse with connection requests
+func FastCollection(url, db, name string) (*mgo.Collection, error) {
+	if collectionCache == nil {
+		collectionCache = make(map[string]*mgo.Collection)
+	}
+	k := fmt.Sprintf("%s-%s-%s", url, db, name)
+	if cc, ok := collectionCache[k]; ok {
+		return cc, nil
+	}
+	s, err := MongoSession(url)
+	//s.SetMode(mgo.Eventual, true)
+	s.SetMode(mgo.Monotonic, true)
+	if err != nil {
+		log.Printf("Could not get mongo session url: %s", url)
+		log.Printf("Error: %s", err)
+		return nil, err
+	}
+	c := MongoCollection(s, db, name)
+	collectionCache[k] = c
+	return c, nil
+
 }
 
 var mgoSession *mgo.Session
@@ -74,7 +104,7 @@ func geoIndexSession() *mgo.Session {
 	}
 
 	// Optional. Switch the session to a monotonic behavior.
-	//session.SetMode(mgo.Monotonic, true)
+	mgoSession.SetMode(mgo.Monotonic, true)
 	// Connection pooling 
 	return mgoSession.Copy()
 }
@@ -186,19 +216,33 @@ type QuadrantLookup struct {
 	Collection string
 }
 
+var QUAD_INDEX = mgo.Index{
+	Key: []string{"$2d:poly.contour"},
+} // Docs have a typo (http://godoc.org/labix.org/v2/mgo#Collection.EnsureIndexKey the field name is swapped with the 2d index type)
+
+
 type DistributedGeostore struct {
 	GeoIdxDBName   string
 	GeoIdxCollName string
-}
-
-func (dg *DistributedGeostore) Configure(qls []QuadrantLookup) {
+	Quads          []QuadrantLookup
 }
 // The idea is to make sure the nodes have the quodrantes distributed evenly across them
 func (dg *DistributedGeostore) Setup() {
-	/*c := geoIndexCollection()
-	c.EnsureIndex(COORDS_INDEX)*/
-	//info := &mgo.CollectionInfo{false, false, true, TWEET_COLLECTION_MAX_BYTES, TWEET_COLLECTION_MAX_DOCS}
-	//c.Create(info)
+	c := dg.geoIndexCollection()
+	err := c.EnsureIndex(QUAD_INDEX) // Make sure there is an index on the polygon
+	if err != nil {
+		log.Printf("Failed to ensure quad index: %s", err)
+	}
+}
+
+// Store the associated quad
+func (dg *DistributedGeostore) Configure(qls []QuadrantLookup) {
+	dg.Quads = qls
+	for _, q := range dg.Quads {
+		qc := dg.getCollection(q.Host, q.DB, q.Collection)
+		qc.EnsureIndex(COORDS_INDEX)
+		qc.EnsureIndex(PLACE_INDEX)
+	}
 }
 
 func (dg *DistributedGeostore) geoIndexCollection() *mgo.Collection {
@@ -208,60 +252,57 @@ func (dg *DistributedGeostore) geoIndexCollection() *mgo.Collection {
 }
 
 func (dg *DistributedGeostore) getCollection(host, db, name string) *mgo.Collection {
-	s, err := MongoSession(host)
-	if err != nil {
-		fmt.Printf("Failed to get collection from host: %s db %s name %s error: %s", host, db, name, err)
-
-	}
-	return MongoCollection(s, db, name)
+	c, _ := FastCollection(host, db, name) // TODO: Need to do something if error
+	return c
 }
 
 // Given a point find the collection associated with it
+// Originally this was going to be implemented using MongoDB however this is not supported by the database: https://jira.mongodb.org/browse/SERVER-2874
+// Since the number of these is relatively small we can just do a for loop over them and find any that exist
 func (dg *DistributedGeostore) CollectionForPoint(p Point) *mgo.Collection {
-	gc := dg.geoIndexCollection()
-	pts := make([]polyclip.Point, 0)
-	pts = append(pts, p.Point)
-	pts = append(pts, p.Point)
-	poly := Polygon{pts}
-	q := bson.M{"Polygon": bson.M{"$geoWithin": bson.M{"$polygon": poly.Coordinates()}}}
-	//q := bson.M{"Polygon": bson.M{"$geoWithin": bson.M{"$geometry": bson.M{"type": "Point", "coordinates": p.Coordinates()}}}}
-	ql := &QuadrantLookup{}
-	err := gc.Find(q).One(&ql)
-	if err != nil {
-		fmt.Printf("Failed to find polygon for point %f, %f error: %s", p.X, p.Y, err)
-		return nil
+	for _, ql := range dg.Quads {
+		if ql.Poly.Contains(p.Point) {
+			return dg.getCollection(ql.Host, ql.DB, ql.Collection)
+		}
 	}
-	return dg.getCollection(ql.Host, ql.DB, ql.Collection)
+	return nil
 }
 
 // Given a polygon get the collections that cross it
+// Originally was going to query Mongo server however this is should be much faster assuming the size of quadrants is not large
 func (dg *DistributedGeostore) CollectionsForPoly(poly Polygon) []*mgo.Collection {
 	cols := make([]*mgo.Collection, 0)
-	qls := make([]*QuadrantLookup, 0)
-	q := bson.M{"coordinates": bson.M{"$geoWithin": bson.M{"$polygon": poly.Coordinates()}}}
-	gc := dg.geoIndexCollection()
-	gc.Find(q).All(&qls)
-	for _, ql := range qls {
-		cols = append(cols, dg.getCollection(ql.Host, ql.DB, ql.Collection))
+	for _, ql := range dg.Quads {
+		if ql.Poly.BoundingBox().Overlaps(poly.BoundingBox()) {
+			c := dg.getCollection(ql.Host, ql.DB, ql.Collection)
+			cols = append(cols, c)
+		}
 	}
 	return cols
 }
 
 // Stores a stream of tweets
 func (dg *DistributedGeostore) Store(tweets chan *httpstream.Tweet) {
-	for {
+	run := true
+	for run {
 		if t, ok := <-tweets; ok {
 			// Create a point from the tweet
 			p := NewPoint(t.Coordinates.Coordinates[0], t.Coordinates.Coordinates[1])
 			// Caching the collection in CollectionForPoint probably makes sense!
 			c := dg.CollectionForPoint(p)
-			err := c.Insert(t)
-			if err != nil && err != io.EOF {
-				fmt.Printf("(Failed to insert) @%s: %s\n", t.User.ScreenName, t.Text)
-				fmt.Printf("Error: %s\n", err)
+			if c == nil {
+				log.Printf("ERROR: COULD NOT FIND COLLECTION to collection for point: %f, %f", p.X, p.Y)
+				continue
 			}
+			err := c.Insert(t)
+
+			if err != nil && err != io.EOF {
+				log.Printf("(Failed to insert) @%s: %s\n", t.User.ScreenName, t.Text)
+				log.Printf("Error: %s\n", err)
+			}
+			//log.Printf("(%s) @%s: %s\n", c.Name, t.User.ScreenName, t.Text)
 		} else {
-			return
+			run = false
 		}
 	}
 }
@@ -270,11 +311,13 @@ func (dg *DistributedGeostore) Store(tweets chan *httpstream.Tweet) {
 func (dg *DistributedGeostore) Search(poly Polygon) []httpstream.Tweet {
 	resp := make([]httpstream.Tweet, 0)
 	cols := dg.CollectionsForPoly(poly)
+	// These request should be done concurrently example: https://github.com/lateefj/juggler
 	for _, c := range cols {
 		coords := poly.Coordinates()
 		q := bson.M{"coordinates": bson.M{"$geoWithin": bson.M{"$polygon": coords}}}
 		tmp := make([]httpstream.Tweet, 0)
 		c.Find(q).All(&tmp)
+		//log.Printf("(%s): FOUND %d tweets in search [ [%f, %f], [%f, %f], [%f, %f], [%f, %f] ]", c.Name, len(tmp), poly.Contour[0].X, poly.Contour[0].Y, poly.Contour[1].X, poly.Contour[1].Y, poly.Contour[2].X, poly.Contour[2].Y, poly.Contour[3].X, poly.Contour[3].Y)
 		resp = append(resp, tmp...)
 	}
 	return resp
