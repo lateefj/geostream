@@ -166,7 +166,7 @@ func buildTestQuads(dg *DistributedGeostore, initLat, initLon, xinc int) []Quadr
 			pts = append(pts, NewPoint(lat, preLon).Point)
 			pts = append(pts, NewPoint(lat, lon).Point)
 			pts = append(pts, NewPoint(preLat, lon).Point)
-			//fmt.Printf("%f, %f : %f, %f\n", preLat, preLon, lat, lon)
+			fmt.Printf("%f, %f : %f, %f\n", preLat, preLon, lat, lon)
 			poly := Polygon{pts}
 			collName := fmt.Sprintf("%s_%d", dg.GeoIdxCollName, i)
 			q := QuadrantLookup{poly, config.GeoIndexMongoUrl, dg.GeoIdxDBName, collName}
@@ -199,14 +199,12 @@ func TestDistributedGestoreSample(t *testing.T) {
 }
 func TestDGSearch(t *testing.T) {
 	dg := distributedGeostoreInstance()        // Must be here or collection won't get dropped before these are added
-	quads := buildTestQuads(dg, -180, -90, 30) // if the increment (last param) is set to small then it will overload dev laptop
+	quads := buildTestQuads(dg, -180, -90, 40) // if the increment (last param) is set to small then it will overload dev laptop
 	dg.Configure(quads)
-	// Wait for the collection creation to complete
-	time.Sleep(1 * time.Second)
 	stl := NewPoint(80, 35)
 	sbr := NewPoint(100, 50)
 	searchArea := BoundingBox{stl, sbr}
-	allPoints, expectedPoints := buildTestData(dg, 90, 45, searchArea)
+	allPoints, expectedPoints := buildTestData(dg, -180, -90, searchArea)
 	time.Sleep(1 * time.Second)
 	fmt.Printf("Size of all points is %d\n", len(allPoints))
 	fmt.Printf("Size of expectedPoints is %d\n", len(expectedPoints))

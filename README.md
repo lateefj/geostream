@@ -22,11 +22,6 @@ There is a basic configuration file that needs these parameters (config_sample.j
 }
 ```
 
-Quick Install
--------------
-1. go get github.com/lateefj/geostream
-2. goestream --config=my_config.json
-
 
 Source Install
 --------------
@@ -47,9 +42,12 @@ Python setup: cd client; pip install -r requirements.txt
 
 Python script command: python tweets.py $CONFIG_FILE
 
+Distributed Geospacial Data:
+----------------------------
+There is an initial implementation of a way to distribute the geospacial data across many nodes (MongoDB collections). Still tracking down some edge case bugs but the concept is implmented. The other part that is tricky is setting up how the data is disributed accross a cluster of servers.
+
 
 TODO:
 -----
  * Clean code mess
- * Implement sharded solution for goespacial data
 
