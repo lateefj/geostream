@@ -1,3 +1,5 @@
+// This is a wrapper around github.com/akavel/polyclip-go mainly to support helper functions. Would be great to depricate these functions soon.
+
 package main
 
 import (
@@ -48,4 +50,29 @@ func (p *Polygon) Coordinates() [][]float64 {
 		c[i] = pc
 	}
 	return c
+}
+
+// Simple idea is that if any of the passed in points are contained by this polygon then they overlap. This is such a big hack that there is a better way to do this: TODO: FIX THIS HACK 
+func (poly *Polygon) Overlaps(op Polygon) bool {
+	// If any points are contained by the polygon passed in
+	for _, p := range op.Contour {
+		if poly.Contains(p) {
+			return true
+		}
+	}
+	// Reverse check of polygons
+	for _, p := range poly.Contour {
+		if op.Contains(p) {
+			return true
+		}
+	}
+	// If any of the points are equal then they overlap
+	for _, x := range op.Contour {
+		for _, y := range poly.Contour {
+			if x.Equals(y) {
+				return true
+			}
+		}
+	}
+	return false
 }
