@@ -15,7 +15,7 @@ const (
 	TWEET_DB                   = "tdb"
 	TWEET_COLLECTION           = "tweets"
 	QUAD_COLLECTION            = "quads"
-	TWEET_COLLECTION_MAX_BYTES = 104857600 // 8 Gig
+	TWEET_COLLECTION_MAX_BYTES = 504857600 // 500 megs
 	TWEET_COLLECTION_MAX_DOCS  = 100000    // Max docs as per specs
 
 )
@@ -148,7 +148,7 @@ func (sg *SingleGeostore) Search(poly Polygon) []httpstream.Tweet {
 	resp := make([]httpstream.Tweet, 0)
 	c := sg.tweetCollection()
 	coords := poly.Coordinates()
-	q := bson.M{"coordinates": bson.M{"$geoWithin": bson.M{"$polygon": coords}}}
+	q := bson.M{"coordinates.coordinates": bson.M{"$geoWithin": bson.M{"$polygon": coords}}}
 	c.Find(q).All(&resp)
 	return resp
 }
@@ -160,7 +160,7 @@ func (sg *SingleGeostore) FastSearchBox(bb BoundingBox, limit int) []Tweetlet {
 	cords := make([][]float64, 2)
 	cords[0] = bb.BottomLeft.Coordinates()
 	cords[1] = bb.TopRight.Coordinates()
-	q := bson.M{"coordinates": bson.M{"$geoWithin": bson.M{"$box": cords}}}
+	q := bson.M{"coordinates.coordinates": bson.M{"$geoWithin": bson.M{"$box": cords}}}
 	nq := c.Find(q)
 	if limit > 0 {
 		nq = nq.Limit(limit)
@@ -176,7 +176,7 @@ func (sg *SingleGeostore) SearchBox(bb BoundingBox, limit int) []httpstream.Twee
 	cords := make([][]float64, 2)
 	cords[0] = bb.BottomLeft.Coordinates()
 	cords[1] = bb.TopRight.Coordinates()
-	q := bson.M{"coordinates": bson.M{"$geoWithin": bson.M{"$box": cords}}}
+	q := bson.M{"coordinates.coordinates": bson.M{"$geoWithin": bson.M{"$box": cords}}}
 	nq := c.Find(q)
 	if limit > 0 {
 		nq = nq.Limit(limit)
@@ -295,7 +295,7 @@ func (dg *DistributedGeostore) Search(poly Polygon) []httpstream.Tweet {
 	// These request should be done concurrently example: https://github.com/lateefj/juggler
 	for _, c := range cols {
 		coords := poly.Coordinates()
-		q := bson.M{"coordinates": bson.M{"$geoWithin": bson.M{"$polygon": coords}}}
+		q := bson.M{"coordinates.coordinates": bson.M{"$geoWithin": bson.M{"$polygon": coords}}}
 		tmp := make([]httpstream.Tweet, 0)
 		c.Find(q).All(&tmp)
 		//log.Printf("(%s): FOUND %d tweets in search [ [%f, %f], [%f, %f], [%f, %f], [%f, %f] ]", c.Name, len(tmp), poly.Contour[0].X, poly.Contour[0].Y, poly.Contour[1].X, poly.Contour[1].Y, poly.Contour[2].X, poly.Contour[2].Y, poly.Contour[3].X, poly.Contour[3].Y)
