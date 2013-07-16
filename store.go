@@ -1,12 +1,12 @@
 package main
 
 import (
-	"io"
 	"fmt"
-	"log"
+	"github.com/lateefj/httpstream"
+	"io"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
-	"github.com/lateefj/httpstream"
+	"log"
 	//"github.com/araddon/httpstream"
 	//	polyclip "github.com/akavel/polyclip-go"
 )
@@ -15,7 +15,7 @@ const (
 	TWEET_DB                   = "tdb"
 	TWEET_COLLECTION           = "tweets"
 	QUAD_COLLECTION            = "quads"
-	TWEET_COLLECTION_MAX_BYTES = 104857600 // 8 Gig
+	TWEET_COLLECTION_MAX_BYTES = 504857600 // 500 Meg
 	TWEET_COLLECTION_MAX_DOCS  = 100000    // Max docs as per specs
 
 )
@@ -38,9 +38,9 @@ var PLACE_INDEX = mgo.Index{
 } // Docs have a typo (http://godoc.org/labix.org/v2/mgo#Collection.EnsureIndexKey the field name is swapped with the 2d index type)
 
 // Interface to allow for multiple implemntations for benchmarking different strateggies
-// After single node implementation I hope to be able to create a multinode implementation 
+// After single node implementation I hope to be able to create a multinode implementation
 type Geostore interface {
-	Setup()                            // Allow for initialization mainly for setting up specific types of collections 
+	Setup()                            // Allow for initialization mainly for setting up specific types of collections
 	Store(chan *httpstream.Tweet)      // Using channel if the twitter streaming API ever works
 	Search(Polygon) []httpstream.Tweet // Search API
 }
@@ -56,13 +56,14 @@ func MongoSession(url string) (*mgo.Session, error) {
 	return s, nil
 }
 
-// Centralize collection retrieveal 
+// Centralize collection retrieveal
 func MongoCollection(s *mgo.Session, db, name string) *mgo.Collection {
 	c := s.DB(db).C(name)
 	return c
 }
 
 var collectionCache map[string]*mgo.Collection
+
 // Cached collection is needed so we doon't overload the databse with connection requests
 func FastCollection(url, db, name string) (*mgo.Collection, error) {
 	if collectionCache == nil {
@@ -104,7 +105,7 @@ func geoIndexSession() *mgo.Session {
 
 	// Optional. Switch the session to a monotonic behavior.
 	mgoSession.SetMode(mgo.Monotonic, true)
-	// Connection pooling 
+	// Connection pooling
 	return mgoSession.Copy()
 }
 
@@ -120,6 +121,7 @@ func (sg *SingleGeostore) tweetCollection() *mgo.Collection {
 	c.Create(info)
 	return c
 }
+
 // Just make sure there is a geospacial index on the coordinates
 func (sg *SingleGeostore) Setup() {
 	c := sg.tweetCollection()
@@ -143,6 +145,7 @@ func (sg *SingleGeostore) Store(tweets chan *httpstream.Tweet) {
 		}
 	}
 }
+
 // Search for a specific polygon
 func (sg *SingleGeostore) Search(poly Polygon) []httpstream.Tweet {
 	resp := make([]httpstream.Tweet, 0)
@@ -168,6 +171,7 @@ func (sg *SingleGeostore) FastSearchBox(bb BoundingBox, limit int) []Tweetlet {
 	nq.All(&resp)
 	return resp
 }
+
 // Search a specific bounding box
 // Performance bottleneck seems to be marhsaling the objects maybe could just return a bson.M to increase performance
 func (sg *SingleGeostore) SearchBox(bb BoundingBox, limit int) []httpstream.Tweet {
@@ -186,7 +190,7 @@ func (sg *SingleGeostore) SearchBox(bb BoundingBox, limit int) []httpstream.Twee
 }
 
 // Experimental distributed geostorage system
-// Simply put the idea is that post can be distributed over many nodes but the data can still be queried as if it is continous space. This will implement the interface Geostore. It is a pretty straightforward divide and conqour implementation. By breaking up the lon/lat into pieces and then storing which server / dbname that piece is on we can then send the query on to that part. 
+// Simply put the idea is that post can be distributed over many nodes but the data can still be queried as if it is continous space. This will implement the interface Geostore. It is a pretty straightforward divide and conqour implementation. By breaking up the lon/lat into pieces and then storing which server / dbname that piece is on we can then send the query on to that part.
 // Given a polygon we query the index which returns all the nodes we need to send queries to to get the data. Once the data is returned we just make sure there are no duplicates. For inserting the data we query which node the lat/lon is in and send it to that node/dbname.
 
 // Way to associate a polygon with a host, datase and collection
@@ -201,12 +205,12 @@ var QUAD_INDEX = mgo.Index{
 	Key: []string{"$2d:poly.contour"},
 } // Docs have a typo (http://godoc.org/labix.org/v2/mgo#Collection.EnsureIndexKey the field name is swapped with the 2d index type)
 
-
 type DistributedGeostore struct {
 	GeoIdxDBName   string
 	GeoIdxCollName string
 	Quads          []QuadrantLookup
 }
+
 // The idea is to make sure the nodes have the quodrantes distributed evenly across them
 func (dg *DistributedGeostore) Setup() {
 	c := dg.geoIndexCollection()
@@ -287,6 +291,7 @@ func (dg *DistributedGeostore) Store(tweets chan *httpstream.Tweet) {
 		}
 	}
 }
+
 // Search for a specific polygon
 // TODO: Use a set so there are no duplicates
 func (dg *DistributedGeostore) Search(poly Polygon) []httpstream.Tweet {
