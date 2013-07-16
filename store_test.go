@@ -127,9 +127,9 @@ func buildTestData(gs Geostore, initLat, initLon int, searchArea BoundingBox) ([
 	var lat, lon float64
 	lat = float64(initLat)
 	lon = float64(initLon)
-	for x := 0; lat <= 360; x++ {
+	for x := 0; x <= 360; x++ {
 		lat = float64(initLat + x)
-		for y := 0; lon <= 180; y++ {
+		for y := 0; y <= 180; y++ {
 			lon = float64(initLon + y)
 			p := NewPoint(lat, lon)
 			allPoints = append(allPoints, p)
@@ -194,17 +194,17 @@ func TestDistributedGestoreSample(t *testing.T) {
 }
 func TestDGSearch(t *testing.T) {
 	dg := distributedGeostoreInstance()        // Must be here or collection won't get dropped before these are added
-	quads := buildTestQuads(dg, -180, -90, 40) // if the increment (last param) is set to small then it will overload dev laptop
+	quads := buildTestQuads(dg, -180, -90, 20) // if the increment (last param) is set to small then it will overload dev laptop
 	dg.Configure(quads)
-	stl := NewPoint(80, 35)
+	stl := NewPoint(-90, -45)
 	sbr := NewPoint(100, 50)
 	searchArea := BoundingBox{stl, sbr}
 	allPoints, expectedPoints := buildTestData(dg, -180, -90, searchArea)
-	time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Second) // Let the collection storage catch its breath
 	fmt.Printf("Size of all points is %d\n", len(allPoints))
 	fmt.Printf("Size of expectedPoints is %d\n", len(expectedPoints))
 
-	searchPoly := Polygon{polyclip.Polygon{{{80, 35}, {80, 50}, {100, 50}, {100, 35}}}}
+	searchPoly := Polygon{polyclip.Polygon{{{-90, -45}, {-90, 50}, {100, 50}, {100, -45}}}}
 	tws := dg.Search(searchPoly)
 	if len(tws) != len(expectedPoints) {
 		t.Errorf("Expected to have %d tweets found but found %d", len(expectedPoints), len(tws))

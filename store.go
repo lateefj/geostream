@@ -270,8 +270,7 @@ func (dg *DistributedGeostore) CollectionsForPoly(poly Polygon) []*mgo.Collectio
 
 // Stores a stream of tweets
 func (dg *DistributedGeostore) Store(tweets chan *httpstream.Tweet) {
-	run := true
-	for run {
+	for {
 		if t, ok := <-tweets; ok {
 			// Create a point from the tweet
 			p := NewPoint(t.Coordinates.Coordinates[0], t.Coordinates.Coordinates[1])
@@ -289,7 +288,7 @@ func (dg *DistributedGeostore) Store(tweets chan *httpstream.Tweet) {
 			}
 			//log.Printf("(%s) @%s: %s\n", c.Name, t.User.ScreenName, t.Text)
 		} else {
-			run = false
+			return
 		}
 	}
 }
@@ -299,14 +298,29 @@ func (dg *DistributedGeostore) Store(tweets chan *httpstream.Tweet) {
 func (dg *DistributedGeostore) Search(poly Polygon) []httpstream.Tweet {
 	resp := make([]httpstream.Tweet, 0)
 	cols := dg.CollectionsForPoly(poly)
-	// These request should be done concurrently example: https://github.com/lateefj/juggler
+	// Channel for the servers to respond on
+	twc := make(chan []httpstream.Tweet, 0)
+
+	coords := poly.Coordinates()
+	q := bson.M{"coordinates.coordinates": bson.M{"$geoWithin": bson.M{"$polygon": coords}}}
 	for _, c := range cols {
-		coords := poly.Coordinates()
-		q := bson.M{"coordinates.coordinates": bson.M{"$geoWithin": bson.M{"$polygon": coords}}}
-		tmp := make([]httpstream.Tweet, 0)
-		c.Find(q).All(&tmp)
-		//log.Printf("(%s): FOUND %d tweets in search [ [%f, %f], [%f, %f], [%f, %f], [%f, %f] ]", c.Name, len(tmp), poly.Contour[0].X, poly.Contour[0].Y, poly.Contour[1].X, poly.Contour[1].Y, poly.Contour[2].X, poly.Contour[2].Y, poly.Contour[3].X, poly.Contour[3].Y)
+		// Request the results from each collection concurrently
+		go func() {
+			tmp := make([]httpstream.Tweet, 0)
+			c.Find(q).All(&tmp)
+			twc <- tmp
+		}()
+	}
+	log.Printf("Searching %d collections", len(cols))
+	// Put the results from each collection back together again
+	i := 1
+	for tmp := range twc {
 		resp = append(resp, tmp...)
+		if i >= len(cols) {
+			close(twc)
+			break
+		}
+		i++
 	}
 	return resp
 }
