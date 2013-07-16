@@ -42,21 +42,21 @@ func TestPolygon(t *testing.T) {
 	if len(coords) != len(p.Contour) {
 		t.Errorf("Expected %d coordinates but got %d", len(p.Contour), len(coords))
 	}
-	if !p.Overlap(p) {
+	if !p.Overlaps(p) {
 		t.Errorf("Expected p to overlap with itself")
 	}
 	p2 := Polygon{polyclip.Contour{{0, 0}, {0, 7}, {4, 7}, {4, 0}}}
-	if !p2.Overlap(p) {
+	if !p2.Overlaps(p) {
 		t.Errorf("Expected p to overlap with p2")
 	}
-	if !p.Overlap(p2) {
+	if !p.Overlaps(p2) {
 		t.Errorf("Expected p2 to overlap with p")
 	}
 	p3 := Polygon{polyclip.Contour{{10, 10}, {10, 17}, {14, 17}, {14, 10}}}
-	if p3.Overlap(p) {
+	if p3.Overlaps(p) {
 		t.Errorf("p3 should not have any overlap with p")
 	}
-	if p.Overlap(p3) {
+	if p.Overlaps(p3) {
 		t.Errorf("p should not have any overlap with p3")
 	}
 }

@@ -254,7 +254,7 @@ func (dg *DistributedGeostore) CollectionForPoint(p Point) *mgo.Collection {
 func (dg *DistributedGeostore) CollectionsForPoly(poly Polygon) []*mgo.Collection {
 	cols := make([]*mgo.Collection, 0)
 	for _, ql := range dg.Quads {
-		if ql.Poly.BoundingBox().Overlaps(poly.BoundingBox()) {
+		if ql.Poly.Overlaps(poly) {
 			c := dg.getCollection(ql.Host, ql.DB, ql.Collection)
 			cols = append(cols, c)
 		}

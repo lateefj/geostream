@@ -162,7 +162,7 @@ func buildTestQuads(dg *DistributedGeostore, initLat, initLon, xinc int) []Quadr
 		for y := yinc; y <= 180; y = y + yinc {
 			lon = float64(initLon + y)
 			poly := Polygon{polyclip.Contour{{preLat, preLon}, {lat, preLon}, {lat, lon}, {preLat, lon}}}
-			fmt.Printf("%f, %f : %f, %f\n", preLat, preLon, lat, lon)
+			//fmt.Printf("%f, %f : %f, %f\n", preLat, preLon, lat, lon)
 			collName := fmt.Sprintf("%s_%d", dg.GeoIdxCollName, i)
 			q := QuadrantLookup{poly, config.GeoIndexMongoUrl, dg.GeoIdxDBName, collName}
 			quads = append(quads, q)

@@ -53,7 +53,7 @@ func (p *Polygon) Coordinates() [][]float64 {
 }
 
 // Simple idea is that if any of the passed in points are contained by this polygon then they overlap. This is such a big hack that there is a better way to do this: TODO: FIX THIS HACK 
-func (poly *Polygon) Overlap(op Polygon) bool {
+func (poly *Polygon) Overlaps(op Polygon) bool {
 	// If any points are contained by the polygon passed in
 	for _, p := range op.Contour {
 		if poly.Contains(p) {
