@@ -34,7 +34,7 @@ Source Install
 
 Options
 -------
-./geostrem --stream=true/false by default the built in streaming is on however this can be turned off by just passing the --stream=false
+./geostream --stream=true/false by default the built in streaming is on however this can be turned off by just passing the --stream=false
 
 Python Client
 -------------
