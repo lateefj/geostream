@@ -15,7 +15,7 @@ const (
 	TWEET_DB                   = "tdb"
 	TWEET_COLLECTION           = "tweets"
 	QUAD_COLLECTION            = "quads"
-	TWEET_COLLECTION_MAX_BYTES = 504857600 // 500 megs
+	TWEET_COLLECTION_MAX_BYTES = 904857600 // ~900 megs
 	TWEET_COLLECTION_MAX_DOCS  = 100000    // Max docs as per specs
 
 )
