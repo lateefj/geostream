@@ -1,13 +1,13 @@
 package main
 
 import (
-	"os"
-	"fmt"
-	"time"
-	"io/ioutil"
 	"encoding/json"
-	"testing"
+	"fmt"
 	"github.com/lateefj/httpstream"
+	"io/ioutil"
+	"os"
+	"testing"
+	"time"
 	//"github.com/araddon/httpstream"
 	polyclip "github.com/akavel/polyclip-go"
 )
@@ -161,7 +161,7 @@ func buildTestQuads(dg *DistributedGeostore, initLat, initLon, xinc int) []Quadr
 		lat = float64(initLat + x)
 		for y := yinc; y <= 180; y = y + yinc {
 			lon = float64(initLon + y)
-			poly := Polygon{polyclip.Contour{{preLat, preLon}, {lat, preLon}, {lat, lon}, {preLat, lon}}}
+			poly := Polygon{polyclip.Polygon{{{preLat, preLon}, {lat, preLon}, {lat, lon}, {preLat, lon}}}}
 			//fmt.Printf("%f, %f : %f, %f\n", preLat, preLon, lat, lon)
 			collName := fmt.Sprintf("%s_%d", dg.GeoIdxCollName, i)
 			q := QuadrantLookup{poly, config.GeoIndexMongoUrl, dg.GeoIdxDBName, collName}
@@ -204,7 +204,7 @@ func TestDGSearch(t *testing.T) {
 	fmt.Printf("Size of all points is %d\n", len(allPoints))
 	fmt.Printf("Size of expectedPoints is %d\n", len(expectedPoints))
 
-	searchPoly := Polygon{polyclip.Contour{{80, 35}, {80, 50}, {100, 50}, {100, 35}}}
+	searchPoly := Polygon{polyclip.Polygon{{{80, 35}, {80, 50}, {100, 50}, {100, 35}}}}
 	tws := dg.Search(searchPoly)
 	if len(tws) != len(expectedPoints) {
 		t.Errorf("Expected to have %d tweets found but found %d", len(expectedPoints), len(tws))
@@ -227,7 +227,7 @@ func TestSGSearch(t *testing.T) {
 	}
 	fmt.Printf("Size of all points is %d\n", len(allPoints))
 	fmt.Printf("Size of expectedPoints is %d\n", len(expectedPoints))
-	time.Sleep(1 * time.Second) // Hack hack 
+	time.Sleep(1 * time.Second) // Hack hack
 	c := sg.tweetCollection()
 	size, _ := c.Count()
 	if size != len(allPoints) {
@@ -238,7 +238,7 @@ func TestSGSearch(t *testing.T) {
 	if len(tws) != len(expectedPoints) {
 		t.Errorf("Expected to have %d tweets found but found %d", len(expectedPoints), len(tws))
 	}
-	searchPoly := Polygon{polyclip.Contour{{80, 35}, {80, 50}, {100, 50}, {100, 35}}}
+	searchPoly := Polygon{polyclip.Polygon{{{80, 35}, {80, 50}, {100, 50}, {100, 35}}}}
 	tws = sg.Search(searchPoly)
 	if len(tws) != len(expectedPoints) {
 		t.Errorf("Expected to have %d tweets found but found %d", len(expectedPoints), len(tws))
@@ -275,7 +275,7 @@ func Benchmark_SinglePolygonSearch(b *testing.B) {
 	sbr := NewPoint(125, 47)
 	searchArea := BoundingBox{stl, sbr}
 	_, expectedPoints := buildTestData(sg, -180, -90, searchArea)
-	searchPoly := Polygon{polyclip.Contour{{122, 42}, {122, 47}, {125, 47}, {125, 42}}}
+	searchPoly := Polygon{polyclip.Polygon{{{122, 42}, {122, 47}, {125, 47}, {125, 42}}}}
 	tws := sg.Search(searchPoly)
 	if len(tws) != len(expectedPoints) {
 		b.Errorf("Expected to have %d tweets found but found %d", len(expectedPoints), len(tws))

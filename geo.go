@@ -37,42 +37,25 @@ func (bb *BoundingBox) Contains(p Point) bool {
 }
 
 type Polygon struct {
-	polyclip.Contour
+	polyclip.Polygon
 }
 
 // Generate list of coordinates for based on Points
 func (p *Polygon) Coordinates() [][]float64 {
-	c := make([][]float64, len(p.Contour))
-	for i, x := range p.Contour {
-		pc := make([]float64, 2)
-		pc[0] = x.X
-		pc[1] = x.Y
-		c[i] = pc
+	coords := make([][]float64, 0)
+	for _, c := range p.Polygon {
+		for _, x := range c {
+			pc := make([]float64, 2)
+			pc[0] = x.X
+			pc[1] = x.Y
+			coords = append(coords, pc)
+		}
 	}
-	return c
+	return coords
 }
 
-// Simple idea is that if any of the passed in points are contained by this polygon then they overlap. This is such a big hack that there is a better way to do this: TODO: FIX THIS HACK 
+// Simple idea is that if any of the passed in points are contained by this polygon then they overlap. This is such a big hack that there is a better way to do this: TODO: FIX THIS HACK
 func (poly *Polygon) Overlaps(op Polygon) bool {
-	// If any points are contained by the polygon passed in
-	for _, p := range op.Contour {
-		if poly.Contains(p) {
-			return true
-		}
-	}
-	// Reverse check of polygons
-	for _, p := range poly.Contour {
-		if op.Contains(p) {
-			return true
-		}
-	}
-	// If any of the points are equal then they overlap
-	for _, x := range op.Contour {
-		for _, y := range poly.Contour {
-			if x.Equals(y) {
-				return true
-			}
-		}
-	}
-	return false
+	result := poly.Polygon.Construct(polyclip.INTERSECTION, op.Polygon)
+	return len(result) > 0
 }

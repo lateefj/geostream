@@ -246,8 +246,10 @@ func (dg *DistributedGeostore) getCollection(host, db, name string) *mgo.Collect
 // Since the number of these is relatively small we can just do a for loop over them and find any that exist
 func (dg *DistributedGeostore) CollectionForPoint(p Point) *mgo.Collection {
 	for _, ql := range dg.Quads {
-		if ql.Poly.Contains(p.Point) {
-			return dg.getCollection(ql.Host, ql.DB, ql.Collection)
+		for _, c := range ql.Poly.Polygon {
+			if c.Contains(p.Point) {
+				return dg.getCollection(ql.Host, ql.DB, ql.Collection)
+			}
 		}
 	}
 	return nil
