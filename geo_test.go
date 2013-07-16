@@ -59,5 +59,6 @@ func TestPolygon(t *testing.T) {
 	if p.Overlaps(p3) {
 		t.Errorf("p should not have any overlap with p3")
 	}
-	//TODO: Add cross to verify that this will work with that type of polygon
+	//TODO: Add cross polygon to verify that this will work with that type of polygon
 }
+// TODO: Benckmark the polygon Overlaps

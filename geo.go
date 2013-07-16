@@ -54,7 +54,7 @@ func (p *Polygon) Coordinates() [][]float64 {
 	return coords
 }
 
-// Simple idea is that if any of the passed in points are contained by this polygon then they overlap. This is such a big hack that there is a better way to do this: TODO: FIX THIS HACK
+// Thank to polyclip author for pointed out an obvious solution!!!
 func (poly *Polygon) Overlaps(op Polygon) bool {
 	result := poly.Polygon.Construct(polyclip.INTERSECTION, op.Polygon)
 	return len(result) > 0
