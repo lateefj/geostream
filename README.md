@@ -51,4 +51,5 @@ There is an initial implementation of a way to distribute the geospacial data ac
 TODO:
 -----
  * Clean code mess
+ * Test edge (litaraly) since there seems to be a lot of bugs on the geometric edges. 
 

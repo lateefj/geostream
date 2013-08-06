@@ -16,6 +16,8 @@ const (
 type Config struct {
 	TwitterUser       string `json:"TWITTER_SUER"`
 	GoogleMapsAPI     string `json:"GOOGLE_MAPS_API"`
+	InitLatitude      string `json:"INIT_LATITUDE"`
+	InitLongitude     string `json:"INIT_LONGITUDE"`
 	GeoIndexMongoUrl  string `json:"GEO_INDEX_MONGO_URL"`
 	ConsumerKey       string `json:"CONSUMER_KEY"`
 	ConsumerSecret    string `json:"CONSUMER_SECRET"`

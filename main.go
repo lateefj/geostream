@@ -5,6 +5,7 @@ import (
 	"log"
 	"flag"
 	//"time"
+	"bytes"
 	"strconv"
 	"strings"
 	"net/http"
@@ -73,8 +74,13 @@ func homeHandler(w http.ResponseWriter, req *http.Request) {
 		log.Printf("FAILED TO READ CONFIGURATION FILE!!! %s", err)
 		panic(err)
 	}
+	// Need to create a buffer so can parse
+	buff := bytes.NewBufferString("")
+	headerTempl := template.Must(template.ParseFiles("header.html"))
+	headerTempl.Execute(buff, config)
+
 	homeTempl := template.Must(template.ParseFiles("home.html"))
-	homeTempl.Execute(w, config.GoogleMapsAPI)
+	homeTempl.Execute(w, buff.String())
 }
 
 // This just consumes tweets
@@ -87,6 +93,7 @@ func streamProducer() {
 }
 
 var startTwitterStream *bool = flag.Bool("stream", true, "Start the Twitter streaming in the web server ")
+var port *int = flag.Int("port", 8000, "Port number to start geostream on")
 
 func main() {
 	flag.Parse()
@@ -112,7 +119,7 @@ func main() {
 
 	// Hook up Gorilla MUX
 	http.Handle("/", r)
-	if err := http.ListenAndServe(":8000", nil); err != nil {
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), nil); err != nil {
 		log.Fatal("ListenAndServe:", err)
 	}
 }
