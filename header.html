@@ -72,7 +72,7 @@ function initialize() {
     var data = {'box': bs};
 
     $.ajax({
-      url: '/api/search',
+      url: '{{.Path}}/api/search',
       data: data,
       success: handleResults,
       error: handleError,

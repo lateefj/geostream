@@ -68,6 +68,11 @@ func InitRest(r *mux.Router) {
 	r.HandleFunc("/add", httphacks.JSONWrap(addHandler))
 }
 
+type HeaderContext struct {
+	Config
+	Path string
+}
+
 func homeHandler(w http.ResponseWriter, req *http.Request) {
 	config, err := GetConfig()
 	if err != nil {
@@ -77,10 +82,24 @@ func homeHandler(w http.ResponseWriter, req *http.Request) {
 	// Need to create a buffer so can parse
 	buff := bytes.NewBufferString("")
 	headerTempl := template.Must(template.ParseFiles("header.html"))
-	headerTempl.Execute(buff, config)
+	headerTempl.Execute(buff, &HeaderContext{Config: *config, Path: ""})
 
 	homeTempl := template.Must(template.ParseFiles("home.html"))
 	homeTempl.Execute(w, buff.String())
+}
+
+// Way to export the header so it an be embedded in http://lhj.me/
+func headerHandler(w http.ResponseWriter, req *http.Request) {
+	config, err := GetConfig()
+	if err != nil {
+		log.Printf("FAILED TO READ CONFIGURATION FILE!!! %s", err)
+		panic(err)
+	}
+	path := req.FormValue("path")
+	// Need to create a buffer so can parse
+	headerTempl := template.Must(template.ParseFiles("header.html"))
+	headerTempl.Execute(w, &HeaderContext{Config: *config, Path: path})
+
 }
 
 // This just consumes tweets
@@ -116,6 +135,7 @@ func main() {
 
 	// Templates 
 	r.HandleFunc("/", homeHandler)
+	r.HandleFunc("/header", headerHandler)
 
 	// Hook up Gorilla MUX
 	http.Handle("/", r)
